@@ -1,0 +1,6 @@
+pandas
+numpy
+xlsxwriter
+matplotlib
+holidays
+streamlit
