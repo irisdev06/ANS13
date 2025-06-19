@@ -95,6 +95,14 @@ def generar_tabla_resumen(datos: pd.DataFrame) -> dict:
     proveedores_objetivo = ['UTMDL', 'GESTAR INNOVACION', 'BELISARIO397', 'BELISARIO']
     datos = datos[datos['Proveedor'].isin(proveedores_objetivo)].copy()
 
+    # Asegurarse de que las columnas 'TERMINOS' y 'UNIVERSO' son numéricas
+    datos['TERMINOS'] = pd.to_numeric(datos['TERMINOS'], errors='coerce')  # Convertir 'TERMINOS' a numérico
+    datos['UNIVERSO'] = pd.to_numeric(datos['UNIVERSO'], errors='coerce')  # Convertir 'UNIVERSO' a numérico
+
+    # Reemplazar NaN por 0 (esto asegura que no haya problemas en los cálculos)
+    datos['TERMINOS'].fillna(0, inplace=True)
+    datos['UNIVERSO'].fillna(0, inplace=True)
+
     tablas_por_proveedor = {}
 
     for proveedor in proveedores_objetivo:
@@ -107,6 +115,7 @@ def generar_tabla_resumen(datos: pd.DataFrame) -> dict:
             TERMINOS=('TERMINO', lambda x: (x == 'EN TERMINO').sum())
         ).reset_index()
 
+        # Cálculo de porcentaje (ahora las columnas son numéricas)
         resumen['PORCENTAJE INDICADO'] = (
             (resumen['TERMINOS'] / resumen['UNIVERSO']) * 100
         ).round(2).astype(str) + '%'
@@ -114,6 +123,7 @@ def generar_tabla_resumen(datos: pd.DataFrame) -> dict:
         tablas_por_proveedor[proveedor] = resumen
 
     return tablas_por_proveedor
+
 
 # Destinatario
 def transformar_destinatarios(df_base):
