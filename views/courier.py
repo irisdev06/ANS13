@@ -95,10 +95,6 @@ def generar_tabla_resumen(datos: pd.DataFrame) -> dict:
     proveedores_objetivo = ['UTMDL', 'GESTAR INNOVACION', 'BELISARIO397', 'BELISARIO']
     datos = datos[datos['Proveedor'].isin(proveedores_objetivo)].copy()
 
-    # Asegurarse de que las columnas necesarias existen
-    if 'TERMINO' not in datos.columns:
-        datos['TERMINO'] = 'EN TERMINO'  # O cualquier valor predeterminado que sea apropiado
-
     tablas_por_proveedor = {}
 
     for proveedor in proveedores_objetivo:
@@ -111,6 +107,10 @@ def generar_tabla_resumen(datos: pd.DataFrame) -> dict:
             TERMINOS=('TERMINO', lambda x: (x == 'EN TERMINO').sum())
         ).reset_index()
 
+        # Convertir 'TERMINOS' a numérico (si es necesario)
+        resumen['TERMINOS'] = pd.to_numeric(resumen['TERMINOS'], errors='coerce').fillna(0)
+
+        # Calcular porcentaje indicado, redondeando los valores numéricos
         resumen['PORCENTAJE INDICADO'] = (
             (resumen['TERMINOS'] / resumen['UNIVERSO']) * 100
         ).round(2).astype(str) + '%'
@@ -118,6 +118,7 @@ def generar_tabla_resumen(datos: pd.DataFrame) -> dict:
         tablas_por_proveedor[proveedor] = resumen
 
     return tablas_por_proveedor
+
 
 
 # Destinatario
