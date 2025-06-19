@@ -95,13 +95,9 @@ def generar_tabla_resumen(datos: pd.DataFrame) -> dict:
     proveedores_objetivo = ['UTMDL', 'GESTAR INNOVACION', 'BELISARIO397', 'BELISARIO']
     datos = datos[datos['Proveedor'].isin(proveedores_objetivo)].copy()
 
-    # Asegurarse de que las columnas 'TERMINOS' y 'UNIVERSO' son numéricas
-    datos['TERMINOS'] = pd.to_numeric(datos['TERMINOS'], errors='coerce')  # Convertir 'TERMINOS' a numérico
-    datos['UNIVERSO'] = pd.to_numeric(datos['UNIVERSO'], errors='coerce')  # Convertir 'UNIVERSO' a numérico
-
-    # Reemplazar NaN por 0 (esto asegura que no haya problemas en los cálculos)
-    datos['TERMINOS'].fillna(0, inplace=True)
-    datos['UNIVERSO'].fillna(0, inplace=True)
+    # Asegurarse de que las columnas necesarias existen
+    if 'TERMINO' not in datos.columns:
+        datos['TERMINO'] = 'EN TERMINO'  # O cualquier valor predeterminado que sea apropiado
 
     tablas_por_proveedor = {}
 
@@ -115,7 +111,6 @@ def generar_tabla_resumen(datos: pd.DataFrame) -> dict:
             TERMINOS=('TERMINO', lambda x: (x == 'EN TERMINO').sum())
         ).reset_index()
 
-        # Cálculo de porcentaje (ahora las columnas son numéricas)
         resumen['PORCENTAJE INDICADO'] = (
             (resumen['TERMINOS'] / resumen['UNIVERSO']) * 100
         ).round(2).astype(str) + '%'
