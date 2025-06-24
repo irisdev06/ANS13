@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from itertools import cycle, islice
 import tempfile
 import holidays
+from pandas.tseries.offsets import CustomBusinessDay
 from datetime import date
 from io import BytesIO
 import os
@@ -13,7 +14,8 @@ from datetime import datetime, timedelta
 
 # Cargar el CSV y convierte las columnas de fecha
 def cargar_datos(archivo) -> pd.DataFrame:
-    datos = pd.read_csv(archivo, sep=";")
+    datos = pd.read_csv(archivo, sep=";", encoding="utf-8", on_bad_lines="warn", engine="python")
+
     datos['FECHA RADICACION'] = pd.to_datetime(datos['FECHA RADICACION'], errors='coerce', dayfirst=False)
     datos['FECHA RECIBIDO CORRESPONDENCIA'] = pd.to_datetime(datos['FECHA RECIBIDO CORRESPONDENCIA'], errors='coerce', dayfirst=False)
     return datos
@@ -279,77 +281,72 @@ def generar_medio_envio(df_base: pd.DataFrame, workbook) -> None:
     worksheet.autofilter(0, 0, startrow, len(medios_envio) + 1)
 
 # Función para generar la hoja Alerta
+
 def generar_alerta(df_courier: pd.DataFrame, workbook) -> None:
-    hoy = datetime.today()
-    dia_semana = hoy.weekday()  # Lunes=0, Martes=1, ..., Domingo=6
-    
-    # Obtener los festivos de Colombia para el año en curso
-    years = [hoy.year]
-    festivos = holidays.Colombia(years=years)
-    
-    # Si hoy es lunes (dia_semana == 0), se toman los registros desde el viernes, sábado y domingo
-    if dia_semana == 0:
-        # Si es lunes, obtener viernes, sábado y domingo
-        inicio = hoy - timedelta(days=3)  # Viernes
+    hoy = datetime.today().date()
+    ayer = hoy - timedelta(days=1)
+    dia_semana = hoy.weekday()  # lunes = 0, martes = 1, ..., domingo = 6
+    festivos = holidays.Colombia(years=[hoy.year])
+
+    # Caso especial: si ayer fue festivo
+    if ayer in festivos:
+        # Buscar desde el viernes anterior al festivo
+        dias = 1
+        while True:
+            dia = ayer - timedelta(days=dias)
+            if dia.weekday() == 4:  # Viernes
+                inicio = dia
+                break
+            dias += 1
+        fin = ayer
+    elif dia_semana == 0:  # Hoy es lunes
+        if hoy in festivos:
+            inicio = hoy - timedelta(days=3)  # viernes
+            fin = hoy
+        else:
+            inicio = hoy - timedelta(days=3)  # viernes
+            fin = hoy - timedelta(days=1)  # domingo
     else:
-        # Si no es lunes, tomar el día anterior
-        inicio = hoy - timedelta(days=1)  # Ayer
-    
-    # Verificar si hoy es festivo, y ajustar el rango de fechas
-    if hoy.strftime('%Y-%m-%d') in festivos:
-        # Si hoy es festivo, ajustamos la fecha de inicio al día anterior al festivo
-        inicio = hoy - timedelta(days=1)
-    
-    # Si hoy no es festivo y no es lunes, simplemente tomar el día de ayer
-    if dia_semana == 0 and hoy.strftime('%Y-%m-%d') not in festivos:
-        inicio = hoy - timedelta(days=3)  # Viernes
+        inicio = ayer
+        fin = ayer
 
-    # Convertir la fecha de inicio a un objeto de fecha
-    inicio = inicio.date()
+    print(f"📆 Rango corregido: {inicio} hasta {fin}")
 
-    # Convertir a datetime para realizar el filtrado
     df_courier['FECHA RADICACION'] = pd.to_datetime(df_courier['FECHA RADICACION'], errors='coerce')
-    
-    # Filtrar los registros que corresponden a la fecha ajustada
-    df_ayer = df_courier[(df_courier['FECHA RADICACION'].dt.date >= inicio) & (df_courier['ESTADO GUIA'] == 'Por recibir correspondencia')]
+    df_courier['ESTADO GUIA'] = df_courier['ESTADO GUIA'].astype(str).str.strip().str.lower()
 
-    
-    # Obtener los proveedores únicos y contar los registros
-    proveedores_ayer = df_ayer['Proveedor'].dropna().unique()
+    estado_deseado = 'por recibir correspondencia'.lower()
 
-    startrow = 1  # Comenzamos a escribir en la segunda fila
-    total_general = 0  # Inicializamos el contador total
+    df_filtrado = df_courier[
+        (df_courier['FECHA RADICACION'].dt.date >= inicio) &
+        (df_courier['FECHA RADICACION'].dt.date <= fin) &
+        (df_courier['ESTADO GUIA'] == estado_deseado)
+    ]
 
-    # Crear la hoja de alerta
-    sheet_name = 'Alerta'
-    worksheet = workbook.add_worksheet(sheet_name)
-
+    # Crear hoja
+    worksheet = workbook.add_worksheet('Alerta')
     formato_titulo = workbook.add_format({'bold': True, 'bg_color': "#D3D3D3"})
     formato_celdas = workbook.add_format({'text_wrap': True, 'valign': 'top'})
 
-    # Escribir encabezados
     worksheet.write('A1', 'Fecha de Radicación', formato_titulo)
-    worksheet.write('B1', inicio.strftime('%Y-%m-%d'), formato_titulo)  # Fecha ajustada
+    worksheet.write('B1', f'{inicio} hasta {fin}', formato_titulo)
     worksheet.write('C1', 'Total general', formato_titulo)
 
-    # Escribir los proveedores y la cantidad de registros por proveedor
-    for proveedor in proveedores_ayer:
-        df_proveedor_ayer = df_ayer[df_ayer['Proveedor'] == proveedor]
-        total_registros = len(df_proveedor_ayer)
+    proveedores = df_filtrado['Proveedor'].dropna().unique()
+    startrow = 1
+    total_general = 0
 
+    for proveedor in proveedores:
+        total = len(df_filtrado[df_filtrado['Proveedor'] == proveedor])
         worksheet.write(startrow, 0, proveedor, formato_celdas)
-        worksheet.write(startrow, 1, total_registros, formato_celdas)
+        worksheet.write(startrow, 1, total, formato_celdas)
+        total_general += total
+        startrow += 1
 
-        total_general += total_registros  # Sumar al total general
-        startrow += 1  # Incrementar fila
-
-    # Escribir el total general en la fila siguiente
     worksheet.write(startrow, 0, 'Total', formato_titulo)
     worksheet.write(startrow, 1, total_general, formato_titulo)
-
-    # Activar los filtros en las columnas A, B y C
     worksheet.autofilter(0, 0, startrow, 2)
-
+    
 # Función para crear un gráfico de barras apiladas basado en "FECHA RADICACION", "Proveedor" y "MEDIO DE ENVIO = Mensajero"
 def grafico_courier(df_courier, workbook):
     # Asegurar fechas en formato datetime
