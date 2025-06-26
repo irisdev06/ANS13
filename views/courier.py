@@ -329,24 +329,39 @@ def generar_alerta(df_courier: pd.DataFrame, workbook) -> None:
     formato_celdas = workbook.add_format({'text_wrap': True, 'valign': 'top'})
 
     worksheet.write('A1', 'Fecha de Radicación', formato_titulo)
-    worksheet.write('B1', f'{inicio} hasta {fin}', formato_titulo)
-    worksheet.write('C1', 'Total general', formato_titulo)
+    fecha_actual = inicio
+    # Escribir encabezados para cada día dentro del rango
+    col = 1
+    while fecha_actual <= fin:
+        worksheet.write(0, col, f'{fecha_actual}', formato_titulo)
+        fecha_actual += timedelta(days=1)
+        col += 1
+    worksheet.write(0, col, 'Total General', formato_titulo)
 
     proveedores = df_filtrado['Proveedor'].dropna().unique()
     startrow = 1
     total_general = 0
 
     for proveedor in proveedores:
-        total = len(df_filtrado[df_filtrado['Proveedor'] == proveedor])
+        total_por_dia = []
+        for dia in range((fin - inicio).days + 1):
+            dia_actual = inicio + timedelta(days=dia)
+            total_por_dia.append(len(df_filtrado[
+                (df_filtrado['Proveedor'] == proveedor) &
+                (df_filtrado['FECHA RADICACION'].dt.date == dia_actual)
+            ]))
+        # Escribir el proveedor y los totales por día
         worksheet.write(startrow, 0, proveedor, formato_celdas)
-        worksheet.write(startrow, 1, total, formato_celdas)
-        total_general += total
+        for i, total in enumerate(total_por_dia):
+            worksheet.write(startrow, i + 1, total, formato_celdas)
+        total_general += sum(total_por_dia)
         startrow += 1
 
     worksheet.write(startrow, 0, 'Total', formato_titulo)
-    worksheet.write(startrow, 1, total_general, formato_titulo)
-    worksheet.autofilter(0, 0, startrow, 2)
-    
+    worksheet.write(startrow, col, total_general, formato_titulo)
+    worksheet.autofilter(0, 0, startrow, col)  # Autoajustar el filtro
+
+
 # Función para crear un gráfico de barras apiladas basado en "FECHA RADICACION", "Proveedor" y "MEDIO DE ENVIO = Mensajero"
 def grafico_courier(df_courier, workbook):
     # Asegurar fechas en formato datetime
