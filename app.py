@@ -15,7 +15,7 @@ from views.courier import (
 
 
 st.title("📊 ANS13")
-archivo = st.file_uploader("Sube el archivo CSV con las fechas", type=["csv"])
+archivo = st.file_uploader("Sube el archivo CSV o XLSX con las fechas", type=["csv"])
 if archivo is not None:
     datos = cargar_datos(archivo)
     datos = rellenar_fecha_recibido(datos)
