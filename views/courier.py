@@ -12,13 +12,12 @@ import os
 from datetime import datetime, timedelta
 
 
-# Cargar datos desde un archivo CSV o Excel
 def cargar_datos(archivo) -> pd.DataFrame:
     # Detectar el tipo de archivo por su extensión
-    if archivo.endswith('.csv'):
+    if archivo.name.endswith('.csv'):
         # Leer el archivo CSV
         datos = pd.read_csv(archivo, sep=";", encoding="utf-8", on_bad_lines="warn", engine="python")
-    elif archivo.endswith('.xlsx'):
+    elif archivo.name.endswith('.xlsx'):
         # Leer el archivo Excel
         datos = pd.read_excel(archivo, engine="openpyxl")
     else:

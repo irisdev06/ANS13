@@ -10,14 +10,19 @@ from views.courier import (
     obtener_dfs_filtrados,
     obtener_dfs_por_proveedor, 
     generar_tabla_resumen,
-    generar_excel
 )
 
-
+# Título de la aplicación
 st.title("📊 ANS13")
-archivo = st.file_uploader("Sube el archivo CSV o XLSX con las fechas", type=["csv"])
+
+# Subir archivo
+archivo = st.file_uploader("Sube el archivo CSV o XLSX con las fechas", type=["csv", "xlsx"])
+
 if archivo is not None:
+    # Cargar el archivo según su tipo (CSV o XLSX)
     datos = cargar_datos(archivo)
+    
+    # Procesar datos
     datos = rellenar_fecha_recibido(datos)
     datos = calcular_indicador(datos)
     datos = agregar_termino(datos)
@@ -27,6 +32,7 @@ if archivo is not None:
     dfs_proveedores = obtener_dfs_por_proveedor(df_courier)
     resume = generar_tabla_resumen(datos)
     
+    # Generar el archivo de Excel
     excel_bytes = generar_excel(datos)
     
     # Botón para descargar el archivo
