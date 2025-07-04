@@ -4,3 +4,4 @@ xlsxwriter
 matplotlib
 holidays
 streamlit
+openpyxl
