@@ -12,13 +12,24 @@ import os
 from datetime import datetime, timedelta
 
 
-# Cargar el CSV y convierte las columnas de fecha
+# Cargar datos desde un archivo CSV o Excel
 def cargar_datos(archivo) -> pd.DataFrame:
-    datos = pd.read_csv(archivo, sep=";", encoding="utf-8", on_bad_lines="warn", engine="python")
+    # Detectar el tipo de archivo por su extensión
+    if archivo.endswith('.csv'):
+        # Leer el archivo CSV
+        datos = pd.read_csv(archivo, sep=";", encoding="utf-8", on_bad_lines="warn", engine="python")
+    elif archivo.endswith('.xlsx'):
+        # Leer el archivo Excel
+        datos = pd.read_excel(archivo, engine="openpyxl")
+    else:
+        raise ValueError("El archivo debe ser de tipo .csv o .xlsx")
 
+    # Convertir las columnas de fecha
     datos['FECHA RADICACION'] = pd.to_datetime(datos['FECHA RADICACION'], errors='coerce', dayfirst=False)
     datos['FECHA RECIBIDO CORRESPONDENCIA'] = pd.to_datetime(datos['FECHA RECIBIDO CORRESPONDENCIA'], errors='coerce', dayfirst=False)
+    
     return datos
+
 
 # Rellenar fecha de recibido con fecha actual
 def rellenar_fecha_recibido(datos: pd.DataFrame) -> pd.DataFrame:
