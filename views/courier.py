@@ -565,6 +565,76 @@ def tabla_mensajero(df_base, writer):
     worksheet.set_column('A:A', 22)
     worksheet.set_column('B:Z', 15)
 
+def comportamiento_mensajero(df_mensajero, workbook):
+    # Asegurar fechas en formato datetime
+    df_mensajero['FECHA RADICACION'] = pd.to_datetime(df_mensajero['FECHA RADICACION'])
+
+    # Filtrar solo los registros con MEDIO DE ENVIO == 'Mensajero'
+    df_mensajero = df_mensajero[df_mensajero['MEDIO DE ENVIO'].str.lower() == 'mensajero'].copy()
+
+    # Agrupar por fecha (día) y proveedor
+    df_agrupado = df_mensajero.groupby([df_mensajero['FECHA RADICACION'].dt.date, 'Proveedor']) \
+                            .size().reset_index(name='Cantidad')
+
+    # Pivot para gráfico y eliminar valores con cantidad 0
+    df_pivot = df_agrupado.pivot(index='FECHA RADICACION', columns='Proveedor', values='Cantidad').fillna(0)
+
+    # Eliminar las columnas con solo ceros
+    df_pivot = df_pivot.loc[:, (df_pivot != 0).any(axis=0)]
+
+    # Datos
+    fechas = df_pivot.index
+    proveedores = df_pivot.columns
+    x = np.arange(len(fechas))  # posiciones X
+
+    # Colores personalizados
+    colores = ['#809bce', '#95b8d1', "#79cbd1", '#B8E6A7', '#4C9A2A']
+    colores_usar = list(islice(cycle(colores), len(proveedores)))
+
+    # Ancho de barra y desplazamiento
+    total_width = 0.8
+    bar_width = total_width / len(proveedores)
+
+    fig, ax = plt.subplots(figsize=(max(15, len(fechas) * 0.4), 6))
+
+    # Dibujar las barras y agregar los conteos sobre ellas
+    for i, prov in enumerate(proveedores):
+        bars = ax.bar(x + i * bar_width, df_pivot[prov], width=bar_width, label=prov, color=colores_usar[i])
+
+        # Agregar los conteos sobre cada barra
+        for bar in bars:
+            yval = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width() / 2, yval, int(yval), ha='center', va='bottom', fontsize=8)
+
+    # Ejes y leyenda
+    ax.set_xticks(x + total_width / 2 - bar_width / 2)
+    ax.set_xticklabels([fecha.strftime('%Y-%m-%d') for fecha in pd.to_datetime(fechas)],
+                       rotation=90, ha='center', fontsize=7)
+
+    ax.set_xlabel('Fecha de Radicación')
+    ax.set_ylabel('Cantidad')
+    ax.set_title('Comportamiento Mensajero')
+    ax.legend(title='Proveedor', bbox_to_anchor=(1.02, 1), loc='upper left')
+    plt.tight_layout()
+
+    # Guardar imagen en memoria
+    imgdata = BytesIO()
+    plt.savefig(imgdata, format='png', dpi=200, transparent=True)
+    plt.close()
+    imgdata.seek(0)
+
+    # Insertar imagen en hoja de Excel
+    sheet_name = 'Comportamiento Mensajero'
+    existing_sheets = [ws.get_name() for ws in workbook.worksheets()]
+    if sheet_name not in existing_sheets:
+        worksheet = workbook.add_worksheet(sheet_name)
+    else:
+        worksheet = workbook.get_worksheet_by_name(sheet_name)
+
+    worksheet.insert_image('A1', 'grafico_barras_agrupadas_mensajero.png', {'image_data': imgdata})
+
+    return workbook
+
 
 # Grafico Mensajero Tabla
 def grafico_mensajero_tabla(df_base, workbook): 
@@ -727,5 +797,7 @@ def generar_excel(datos: pd.DataFrame) -> bytes:
 
         # Grafico mensajero Torta
         grafico_mensajero_torta(df_base, workbook)
+
+        comportamiento_mensajero(df_base, workbook)
 
     return output.getvalue()
